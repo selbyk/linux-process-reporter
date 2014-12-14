@@ -1,23 +1,25 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <unistd.h>
 
 // Counter to test that intervals are correct
 int counter = 0;
 
-// Function to test printing from thread
-void say_hey()
-{
-    printf("Hey!\n");
-    return;
-}
+typedef struct process {
+    char * str;
+    int pid;
+    struct process * next;
+} process_t;
+
+process_t * head = NULL;
 
 // Function to get all processes using `ps`
-void get_processes()
+int get_processes()
 {
     FILE *fp;
-    char path[1035];
+    char process_str[1035];
 
     /* Open the command for reading. */
     fp = popen("ps -e", "r");
@@ -26,14 +28,51 @@ void get_processes()
       exit(1);
     }
 
+    process_t * current = NULL;
+
     /* Read the output a line at a time - output it. */
-    /*while (fgets(path, sizeof(path)-1, fp) != NULL) {
-      printf("%s", path);
-    }*/
+    while (fgets(process_str, sizeof(process_str)-1, fp) != NULL) {
+      if(current == NULL) {
+          if (head == NULL) {
+              head = malloc(sizeof(process_t));
+              if (head == NULL) {
+                  printf("Oh shit, can't get memory. I'm bailin', yo.\n");
+                  return 1;
+              }
+          }
+          current = head;
+      } else {
+        if (current->next == NULL) {
+            current->next = malloc(sizeof(process_t));
+            if (current->next == NULL) {
+                printf("Oh shit, can't get memory. I'm bailin', yo.\n");
+                return 1;
+            }
+        }
+        current = current->next;
+      }
+      if(current->str != NULL)
+        free(current->str);
+      current->str = malloc(1035*sizeof(*current->str));
+      strcpy(current->str, process_str);
+      current->next = NULL;
+      //printf("%s", process_str);
+    }
 
     /* close */
     pclose(fp);
-    return;
+    return 0;
+}
+
+// Function to test printing from thread
+void print_processes()
+{
+    process_t * current = head;
+
+    while (current != NULL) {
+        printf("%s\n", current->str);
+        current = current->next;
+    }
 }
 
 // Thread to start fetching process information on interval
@@ -58,6 +97,7 @@ int main( int argc, char *argv[] )
   while(1)
   {
       sleep(5);
+      print_processes();
       printf("Counter: %d\n", counter);
   }
 
